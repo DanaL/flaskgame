@@ -46,10 +46,25 @@ function love.load()
     )
     love.graphics.setCanvas()
 
+    -- Create a quad for the bottom third of the mask
+  local maskWidth = gameState.assets.bottleMask:getWidth()
+  local maskHeight = gameState.assets.bottleMask:getHeight()
+  local bottomQuarterHeight = maskHeight / 4
+  gameState.assets.bottomQuarterQuad = love.graphics.newQuad(
+    0,                    -- x position in source image
+    maskHeight - bottomQuarterHeight,  -- y position in source image
+    maskWidth,            -- width to capture
+    bottomQuarterHeight,    -- height to capture
+    maskWidth,            -- total width of source image
+    maskHeight            -- total height of source image
+  )
+
     -- Create some test bottles with different colored liquids
-    for i = 1, 4 do
-        gameState.bottles[i] = {COLORS.RED, COLORS.GREEN, COLORS.BLUE, COLORS.RED}
-    end
+  
+    gameState.bottles[1] = {COLORS.RED, COLORS.GREEN, COLORS.BLUE, COLORS.EMPTY}
+    gameState.bottles[2] = {COLORS.RED, COLORS.GREEN, COLORS.BLUE, COLORS.GREEN}
+    gameState.bottles[3] = {COLORS.BLUE, COLORS.RED, COLORS.EMPTY, COLORS.EMPTY}
+    gameState.bottles[4] = {COLORS.GREEN, COLORS.EMPTY, COLORS.EMPTY, COLORS.EMPTY}
     gameState.bottles[5] = {COLORS.EMPTY, COLORS.EMPTY, COLORS.EMPTY, COLORS.EMPTY}
     gameState.bottles[6] = {COLORS.EMPTY, COLORS.EMPTY, COLORS.EMPTY, COLORS.EMPTY}
 
@@ -80,43 +95,53 @@ function love.load()
     end
 end
 
+function fillBottleSegment(segment, totalSegments, colour, x, y)
+  -- Create a quad for the bottom third of the mask
+  local maskWidth = gameState.assets.bottleMask:getWidth()
+  local maskHeight = gameState.assets.bottleMask:getHeight()
+  local segmentHeight = maskHeight / totalSegments
+  local segmentY = (totalSegments - segment) * segmentHeight
+  local segmentQuad = love.graphics.newQuad(
+    0,                    -- x position in source image
+    segmentY,  -- y position in source image
+    maskWidth,            -- width to capture
+    segmentHeight,    -- height to capture
+    maskWidth,            -- total width of source image
+    maskHeight            -- total height of source image
+  )
+
+  if (colour == COLORS.RED) then
+    love.graphics.setColor(1, 0, 0, 0.5)  -- Semi-transparent red
+  elseif (colour == COLORS.GREEN) then
+    love.graphics.setColor(0, 1, 0, 0.5)  -- Semi-transparent green
+  elseif (colour == COLORS.BLUE) then
+    love.graphics.setColor(0, 0, 1, 0.5)  -- Semi-transparent blue
+  end
+  --love.graphics.draw(gameState.assets.liquidMask, x, y)
+  love.graphics.draw(
+    gameState.assets.liquidMask,
+    segmentQuad,
+    x, y + (bottleHeight * (totalSegments - segment) / totalSegments),
+    0,
+    gameState.assets.bottleScale.x,
+    gameState.assets.bottleScale.y
+  )
+
+end
+
 function drawBottle(bottle, x, y)
-  -- Draw liquids
   for j, color in ipairs(bottle) do
-    if color > COLORS.EMPTY then
-      -- Set different colors based on the number
-      if color == COLORS.RED then
-          love.graphics.setColor(1, 0, 0) -- Red
-      elseif color == COLORS.GREEN then
-          love.graphics.setColor(0, 1, 0) -- Green
-      elseif color == COLORS.BLUE then
-          love.graphics.setColor(0, 0, 1) -- Blue
-      end
-        
-      -- Use the mask to constrain the liquid
-      love.graphics.stencil(function()
-      love.graphics.draw(gameState.assets.liquidMask, x, y)
-      end, "replace", 1, false)
-      love.graphics.setStencilTest("greater", 0)
-    
-      love.graphics.rectangle("fill",
-          x,
-          y + bottleHeight - (j * liquidHeight),
-          bottleWidth,
-          liquidHeight)
-      love.graphics.setStencilTest()
+    if color ~= COLORS.EMPTY then
+      fillBottleSegment(j, 4, color, x, y)
     end
   end
-
+ 
+  -- Draw bottle sprite
   love.graphics.setColor(1, 1, 1)
   love.graphics.draw(gameState.assets.bottleImage, x, y, 0, gameState.assets.bottleScale.x, gameState.assets.bottleScale.y)
 end
 
 function love.draw()
-  -- Debug: Draw the stencil mask directly to see its pixels
-  love.graphics.setColor(1, 0, 0, 0.5)  -- Semi-transparent red
-  love.graphics.draw(gameState.assets.liquidMask, 10, 10)
-
   -- Make sure we reset to white color at the start of draw
   love.graphics.setColor(1, 1, 1)
 
@@ -179,10 +204,7 @@ function love.draw()
 end
 
 function love.mousepressed(x, y, button)
-end
 
-function foo()
---function love.mousepressed(x, y, button)
     -- Check if reset button was clicked
     if x >= resetButton.x and x <= resetButton.x + resetButton.width and
        y >= resetButton.y and y <= resetButton.y + resetButton.height then
