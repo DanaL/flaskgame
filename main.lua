@@ -26,6 +26,7 @@ function love.load()
 
     -- Create the mask for the bottle sprite
     gameState.assets.bottleMask = love.graphics.newImage("assets/sprites/bottle_mask.png")
+    gameState.assets.bottleMask:setFilter("nearest", "nearest")
     gameState.assets.bottleImage:setFilter("nearest", "nearest")
     gameState.assets.bottleScale = {
       x = bottleWidth / gameState.assets.bottleImage:getWidth(),
@@ -83,27 +84,27 @@ function drawBottle(bottle, x, y)
   -- Draw liquids
   for j, color in ipairs(bottle) do
     if color > COLORS.EMPTY then
-        -- Set different colors based on the number
-        if color == COLORS.RED then
-            love.graphics.setColor(1, 0, 0) -- Red
-        elseif color == COLORS.GREEN then
-            love.graphics.setColor(0, 1, 0) -- Green
-        elseif color == COLORS.BLUE then
-            love.graphics.setColor(0, 0, 1) -- Blue
-        end
+      -- Set different colors based on the number
+      if color == COLORS.RED then
+          love.graphics.setColor(1, 0, 0) -- Red
+      elseif color == COLORS.GREEN then
+          love.graphics.setColor(0, 1, 0) -- Green
+      elseif color == COLORS.BLUE then
+          love.graphics.setColor(0, 0, 1) -- Blue
+      end
         
-        -- Use the mask to constrain the liquid
-        love.graphics.stencil(function()
-        love.graphics.draw(gameState.assets.liquidMask, x, y)
-        end, "replace", 1)
+      -- Use the mask to constrain the liquid
+      love.graphics.stencil(function()
+      love.graphics.draw(gameState.assets.liquidMask, x, y)
+      end, "replace", 1, false)
       love.graphics.setStencilTest("greater", 0)
-     
-        love.graphics.rectangle("fill",
-            x,
-            y + bottleHeight - (j * liquidHeight),
-            bottleWidth,
-            liquidHeight)
-        love.graphics.setStencilTest()
+    
+      love.graphics.rectangle("fill",
+          x,
+          y + bottleHeight - (j * liquidHeight),
+          bottleWidth,
+          liquidHeight)
+      love.graphics.setStencilTest()
     end
   end
 
@@ -112,6 +113,7 @@ function drawBottle(bottle, x, y)
 end
 
 function love.draw()
+  -- Debug: Draw the stencil mask directly to see its pixels
   love.graphics.setColor(1, 0, 0, 0.5)  -- Semi-transparent red
   love.graphics.draw(gameState.assets.liquidMask, 10, 10)
 
