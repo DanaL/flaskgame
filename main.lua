@@ -41,17 +41,14 @@ function love.load()
 
   gameState.assets.bottleImage = love.graphics.newImage("assets/sprites/bottle.png")
   gameState.assets.bottleImage:setFilter("nearest", "nearest")
-
-  --local foo = gameState.assets.bottleImage:getData()
-  -- Create the mask for the bottle sprite
-  gameState.assets.bottleMask = love.graphics.newImage("assets/sprites/bottle_mask.png")
-  gameState.assets.bottleMask:setFilter("nearest", "nearest")
   gameState.assets.bottleScale = {
     x = bottleWidth / gameState.assets.bottleImage:getWidth(),
     y = bottleHeight / gameState.assets.bottleImage:getHeight()
   }
-  --gameState.assets.bottleMaskData = gameState.assets.bottleMask:getData()
 
+  gameState.assets.bottleMask = love.graphics.newImage("assets/sprites/bottle_mask.png")
+  gameState.assets.bottleMask:setFilter("nearest", "nearest")
+  
   gameState.assets.liquidMask = love.graphics.newCanvas(bottleWidth, bottleHeight)
   love.graphics.setCanvas(gameState.assets.liquidMask)
   love.graphics.clear()
@@ -66,32 +63,15 @@ function love.load()
   )
   love.graphics.setCanvas()
 
-  -- Create a quad for the bottom third of the mask
-  local maskWidth = gameState.assets.bottleMask:getWidth()
-  local maskHeight = gameState.assets.bottleMask:getHeight()
-  local bottomQuarterHeight = maskHeight / 4
-  gameState.assets.bottomQuarterQuad =
-    love.graphics.newQuad(
-    0, -- x position in source image
-    maskHeight - bottomQuarterHeight, -- y position in source image
-    maskWidth, -- width to capture
-    bottomQuarterHeight, -- height to capture
-    maskWidth, -- total width of source image
-    maskHeight -- total height of source image
-  )
   gameState.assets.bottleMaskData = love.image.newImageData("assets/sprites/bottle_mask.png")
 
   -- Create some test bottles with different colored liquids
-
   gameState.bottles[1] = {COLORS.RED, COLORS.GREEN, COLORS.BLUE, COLORS.EMPTY}
   gameState.bottles[2] = {COLORS.RED, COLORS.GREEN, COLORS.BLUE, COLORS.GREEN}
   gameState.bottles[3] = {COLORS.BLUE, COLORS.RED, COLORS.EMPTY, COLORS.EMPTY}
   gameState.bottles[4] = {COLORS.GREEN, COLORS.EMPTY, COLORS.EMPTY, COLORS.EMPTY}
   gameState.bottles[5] = {COLORS.EMPTY, COLORS.EMPTY, COLORS.EMPTY, COLORS.EMPTY}
   gameState.bottles[6] = {COLORS.EMPTY, COLORS.EMPTY, COLORS.EMPTY, COLORS.EMPTY}
-
-  -- Game variables
-  selectedBottle = nil
 
   liquidHeight = bottleHeight / 4 -- Each liquid segment height
 
@@ -167,7 +147,7 @@ function fillBottleSegment(segment, totalSegments, colour, x, y)
 end
 
 function drawBottle(bottle, x, y, bottleNum)
-  if selectedBottle == bottleNum then
+  if gameState.selectedBottle == bottleNum then
     x = x + 10
     y = y - 10    
   end
@@ -280,7 +260,7 @@ function love.mousepressed(x, y, button)
         gameState.bottles[i][j] = color
       end
     end
-    selectedBottle = nil
+    gameState.selectedBottle = nil
     return
   end
 
@@ -301,19 +281,19 @@ function love.mousepressed(x, y, button)
         local r, g, b, a = gameState.assets.bottleMaskData:getPixel(localX, localY)
         if a > 0.5 then          
           bottleClicked = true          
-          if selectedBottle == nil then
+          if gameState.selectedBottle == nil then
             -- Only select if bottle isn't empty
             if not isBottleEmpty(bottle) then
-              selectedBottle = i
+              gameState.selectedBottle = i
               local clink = bottleClink:clone()
               clink:play()
             end
           else
             -- Try to pour from selected bottle to clicked bottle
-            if selectedBottle ~= i then -- Can't pour into same bottle
-              pourLiquid(selectedBottle, i)
+            if gameState.selectedBottle ~= i then -- Can't pour into same bottle
+              pourLiquid(gameState.selectedBottle, i)
             end
-            selectedBottle = nil
+            gameState.selectedBottle = nil
           end
           break
         end
@@ -323,7 +303,7 @@ function love.mousepressed(x, y, button)
 
   -- If we clicked outside any bottle, clear the selection
   if not bottleClicked then
-    selectedBottle = nil
+    gameState.selectedBottle = nil
   end
 end
 
