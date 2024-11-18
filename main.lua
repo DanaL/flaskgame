@@ -16,6 +16,9 @@ local COLORS = {
 }
 
 function love.load()
+  local font = love.graphics.newFont("assets/fonts/slkscr.ttf", 18)
+  love.graphics.setFont(font)
+
   love.graphics.setBackgroundColor(0.67, 0.85, 0.9, 0.5)
 
   -- Initialize game state
@@ -86,6 +89,10 @@ function love.load()
     height = 40
   }
 
+  bottleClink = love.audio.newSource("assets/sounds/clink.mp3", "static")
+  bottleClink:setVolume(0.75)
+  plopSound = love.audio.newSource("assets/sounds/plop.mp3", "static")
+
   -- Store initial bottle state
   initialBottles = {}
   for i, bottle in ipairs(gameState.bottles) do
@@ -131,7 +138,12 @@ function fillBottleSegment(segment, totalSegments, colour, x, y)
   )
 end
 
-function drawBottle(bottle, x, y)
+function drawBottle(bottle, x, y, bottleNum)
+  if selectedBottle == bottleNum then
+    x = x + 10
+    y = y - 10    
+  end
+
   for j, color in ipairs(bottle) do
     if color ~= COLORS.EMPTY then
       fillBottleSegment(j, 4, color, x, y)
@@ -168,7 +180,7 @@ function love.draw()
   for i, bottle in ipairs(gameState.bottles) do
     local x = 25 + (i - 1) * 125
     local y = 225
-    drawBottle(bottle, x, y)
+    drawBottle(bottle, x, y, i)
   end
 end
 
@@ -205,12 +217,14 @@ function love.mousepressed(x, y, button)
           localY < gameState.assets.bottleMaskData:getHeight()
        then
         local r, g, b, a = gameState.assets.bottleMaskData:getPixel(localX, localY)
-        if a > 0.5 then
-          bottleClicked = true
+        if a > 0.5 then          
+          bottleClicked = true          
           if selectedBottle == nil then
             -- Only select if bottle isn't empty
             if not isBottleEmpty(bottle) then
               selectedBottle = i
+              local clink = bottleClink:clone()
+              clink:play()
             end
           else
             -- Try to pour from selected bottle to clicked bottle
@@ -228,6 +242,11 @@ function love.mousepressed(x, y, button)
   -- If we clicked outside any bottle, clear the selection
   if not bottleClicked then
     selectedBottle = nil
+  end
+
+  if bottleClicked and selectedBottle ~= nil and not isBottleEmpty(gameState.bottles[selectedBottle]) then
+    --local clink = bottleClink:clone()
+    --clink:play()
   end
 end
 
@@ -316,5 +335,8 @@ function pourLiquid(fromIdx, toIdx)
         amountToPour = amountToPour - 1
       end
     end
+
+    local plop = plopSound:clone()
+    plop:play()
   end
 end
