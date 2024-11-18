@@ -12,7 +12,7 @@ local gameState = {
     colors = {},
     particles = {},
     startTime = 0,
-    duration = 3,  -- How long to show popup
+    duration = 4,  -- How long to show popup
     particleSystem = nil
   }
 }
@@ -249,6 +249,12 @@ function wasResetClicked(x, y)
 end
 
 function love.mousepressed(x, y, button)
+  if gameState.popup.active then
+    gameState.popup.active = false
+    victorySound:stop()
+    return
+  end
+
   -- Check if reset button was clicked
   if wasResetClicked(x, y) then
     -- Reset game state
