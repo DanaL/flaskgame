@@ -1,9 +1,19 @@
 local gameState = {
+  moves = 0,
   bottles = {},
   selectedBottle = nil,
   assets = {
     bottleImage = nil,
     bottleScale = {}
+  },
+  popup = {
+    active = false,
+    text = "",
+    colors = {},
+    particles = {},
+    startTime = 0,
+    duration = 3,  -- How long to show popup
+    particleSystem = nil
   }
 }
 
@@ -16,8 +26,12 @@ local COLORS = {
 }
 
 function love.load()
-  local font = love.graphics.newFont("assets/fonts/slkscr.ttf", 18)
-  love.graphics.setFont(font)
+  gameState.fonts = {
+    regular = love.graphics.newFont("assets/fonts/slkscr.ttf", 18),
+    popup = love.graphics.newFont("assets/fonts/slkscr.ttf", 48), 
+    popupSmall = love.graphics.newFont("assets/fonts/slkscr.ttf", 36) 
+  }
+  love.graphics.setFont(gameState.fonts.regular)
 
   love.graphics.setBackgroundColor(0.67, 0.85, 0.9, 0.5)
 
@@ -92,6 +106,7 @@ function love.load()
   bottleClink = love.audio.newSource("assets/sounds/clink.mp3", "static")
   bottleClink:setVolume(0.75)
   plopSound = love.audio.newSource("assets/sounds/plop.mp3", "static")
+  victorySound = love.audio.newSource("assets/sounds/victory.mp3", "static")
 
   -- Store initial bottle state
   initialBottles = {}
@@ -101,6 +116,19 @@ function love.load()
       initialBottles[i][j] = color
     end
   end
+
+  -- Initialize particle system for the win effect
+  local particleImg = love.graphics.newImage("assets/sprites/particle.png")  -- Create a small white circle image
+  gameState.popup.particleSystem = love.graphics.newParticleSystem(particleImg, 1000)
+  gameState.popup.particleSystem:setParticleLifetime(0.5, 2)
+  gameState.popup.particleSystem:setLinearAcceleration(-100, -100, 100, 100)
+  gameState.popup.particleSystem:setColors(
+    1, 0, 0, 1,    -- Red
+    0, 1, 0, 1,    -- Green
+    1, 1, 0, 1,    -- Yellow
+    1, 0, 1, 1     -- Purple
+  )
+  gameState.popup.particleSystem:setSizes(2, 1, 0)  -- Particles shrink over time
 end
 
 function fillBottleSegment(segment, totalSegments, colour, x, y)
@@ -165,6 +193,7 @@ end
 function love.draw()
   -- Make sure we reset to white color at the start of draw
   love.graphics.setColor(1, 1, 1)
+  love.graphics.setFont(gameState.fonts.regular)
 
   -- Draw reset button with more contrast
   love.graphics.setColor(0.5, 0.5, 0.5) -- Darker gray for button
@@ -182,16 +211,69 @@ function love.draw()
     local y = 225
     drawBottle(bottle, x, y, i)
   end
+
+  -- Draw popup if active
+  if gameState.popup.active then
+    -- Draw semi-transparent background
+    love.graphics.setColor(0, 0, 0, 0.5)
+    love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
+    
+    -- Draw particles
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.draw(
+      gameState.popup.particleSystem, 
+      love.graphics.getWidth() / 2, 
+      love.graphics.getHeight() / 2
+    )
+    
+    love.graphics.setFont(gameState.fonts.popup)
+    
+    -- Draw text with rainbow effect
+    local text = gameState.popup.text
+    local font = love.graphics.getFont()
+    local textWidth = font:getWidth(text)
+    local textHeight = font:getHeight()
+    local x = love.graphics.getWidth() / 2 - textWidth / 2
+    local y = love.graphics.getHeight() / 4 - textHeight / 2
+    
+    -- Rainbow wave effect
+    for i = 1, #text do
+      local char = text:sub(i,i)
+      local offset = math.sin(love.timer.getTime() * 3 + i * 0.3) * 10
+      local hue = (love.timer.getTime() * 0.5 + i * 0.1) % 1
+      local r, g, b = HSV(hue, 1, 1)
+      
+      love.graphics.setColor(r, g, b, 1)
+      love.graphics.print(
+        char, 
+        x + font:getWidth(text:sub(1, i-1)), 
+        y + offset
+      )
+    end
+    
+    -- Draw moves count
+    love.graphics.setFont(gameState.fonts.popupSmall)
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.print(
+      "Completed in " .. gameState.moves .. " moves!", 
+      x, 
+      y + textHeight + 20
+    )
+  end
+end
+
+function wasResetClicked(x, y)
+  return
+    x >= resetButton.x and x <= resetButton.x + resetButton.width 
+    and y >= resetButton.y and y <= resetButton.y + resetButton.height
 end
 
 function love.mousepressed(x, y, button)
   -- Check if reset button was clicked
-  if
-    x >= resetButton.x and x <= resetButton.x + resetButton.width and y >= resetButton.y and
-      y <= resetButton.y + resetButton.height
-   then
+  if wasResetClicked(x, y) then
     -- Reset game state
     gameState.bottles = {}
+    gameState.moves = 0
     for i, bottle in ipairs(initialBottles) do
       gameState.bottles[i] = {}
       for j, color in ipairs(bottle) do
@@ -243,11 +325,6 @@ function love.mousepressed(x, y, button)
   if not bottleClicked then
     selectedBottle = nil
   end
-
-  if bottleClicked and selectedBottle ~= nil and not isBottleEmpty(gameState.bottles[selectedBottle]) then
-    --local clink = bottleClink:clone()
-    --clink:play()
-  end
 end
 
 function isBottleEmpty(bottle)
@@ -280,9 +357,6 @@ function getTopColour(bottle)
     end
   end
 
-  if topColour == COLORS.BLUE then
-    print("Top colour is blue", count)
-  end
   return topColour, count
 end
 
@@ -299,18 +373,8 @@ end
 function pourLiquid(fromIdx, toIdx)
   local fromBottle = gameState.bottles[fromIdx]
   local toBottle = gameState.bottles[toIdx]
-
-  -- Debug prints
-  print("Attempting to pour from bottle", fromIdx, "to bottle", toIdx)
-  print("From bottle contents:", table.concat(fromBottle, ", "))
-  print("To bottle contents:", table.concat(toBottle, ", "))
-
   local topColour, colourCount = getTopColour(fromBottle)
   local emptySpaces = getEmptySpaces(toBottle)
-
-  -- More debug info
-  print("Top colour:", topColour, "Count:", colourCount)
-  print("Empty spaces in target:", emptySpaces)
 
   local canPour = emptySpaces > 0
   if canPour then
@@ -319,6 +383,7 @@ function pourLiquid(fromIdx, toIdx)
   end
 
   if canPour then
+    gameState.moves = gameState.moves + 1
     local amountToPour = math.min(colourCount, emptySpaces)
 
     for i = #fromBottle, 1, -1 do
@@ -338,5 +403,92 @@ function pourLiquid(fromIdx, toIdx)
 
     local plop = plopSound:clone()
     plop:play()
+
+    checkWin()
   end
+end
+
+function checkWin()
+  -- First, count how many segments of each color exist
+  local colorCounts = {}
+  for _, bottle in ipairs(gameState.bottles) do
+    for _, color in ipairs(bottle) do
+      if color ~= COLORS.EMPTY then
+        colorCounts[color] = (colorCounts[color] or 0) + 1
+      end
+    end
+  end
+
+  -- Then check each bottle to ensure it either:
+  -- 1. Is completely empty, or
+  -- 2. Contains all segments of one color
+  for _, bottle in ipairs(gameState.bottles) do
+    if not isBottleEmpty(bottle) then
+      local bottleColor = nil
+      local segmentCount = 0
+      
+      for _, color in ipairs(bottle) do
+        if color ~= COLORS.EMPTY then
+          if bottleColor == nil then
+            bottleColor = color
+          elseif color ~= bottleColor then
+            return false
+          end
+          segmentCount = segmentCount + 1
+        end
+      end
+      
+      -- Check if this bottle has ALL segments of this color
+      if segmentCount ~= colorCounts[bottleColor] then
+        return false
+      end
+    end
+  end
+  
+  -- If we get here, player has won
+  showWinPopup()
+  return true
+end
+
+function showWinPopup()
+  gameState.popup.active = true
+  gameState.popup.text = "Level Complete!"
+  gameState.popup.startTime = love.timer.getTime()
+  
+  -- Reset and emit particles
+  gameState.popup.particleSystem:reset()
+  gameState.popup.particleSystem:emit(200)
+  
+  victorySound:play()
+end
+
+function love.update(dt)
+  -- Update popup
+  if gameState.popup.active then
+    gameState.popup.particleSystem:update(dt)
+    
+    -- Check if popup should end
+    if love.timer.getTime() - gameState.popup.startTime > gameState.popup.duration then
+      gameState.popup.active = false
+    end
+  end
+end
+
+-- Helper function to convert HSV to RGB
+function HSV(h, s, v)
+  local r, g, b
+  local i = math.floor(h * 6)
+  local f = h * 6 - i
+  local p = v * (1 - s)
+  local q = v * (1 - f * s)
+  local t = v * (1 - (1 - f) * s)
+  i = i % 6
+  if i == 0 then r, g, b = v, t, p
+  elseif i == 1 then r, g, b = q, v, p
+  elseif i == 2 then r, g, b = p, v, t
+  elseif i == 3 then r, g, b = p, q, v
+  elseif i == 4 then r, g, b = t, p, v
+  elseif i == 5 then r, g, b = v, p, q
+  end
+  return r, g, b
 end
