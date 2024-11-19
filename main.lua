@@ -22,10 +22,13 @@ local COLORS = {
   EMPTY = 0,
   RED = 1,
   GREEN = 2,
-  BLUE = 3
+  BLUE = 3,
+  PURPLE = 4,
+  ORANGE = 5
 }
 
 function love.load()
+  love.window.setTitle("Untitled Liquid Puzzle Game")
   gameState.fonts = {
     regular = love.graphics.newFont("assets/fonts/slkscr.ttf", 18),
     popup = love.graphics.newFont("assets/fonts/slkscr.ttf", 48), 
@@ -66,13 +69,8 @@ function love.load()
   gameState.assets.bottleMaskData = love.image.newImageData("assets/sprites/bottle_mask.png")
 
   -- Create some test bottles with different colored liquids
-  gameState.bottles[1] = {COLORS.RED, COLORS.GREEN, COLORS.BLUE, COLORS.EMPTY}
-  gameState.bottles[2] = {COLORS.RED, COLORS.GREEN, COLORS.BLUE, COLORS.GREEN}
-  gameState.bottles[3] = {COLORS.BLUE, COLORS.RED, COLORS.EMPTY, COLORS.EMPTY}
-  gameState.bottles[4] = {COLORS.GREEN, COLORS.EMPTY, COLORS.EMPTY, COLORS.EMPTY}
-  gameState.bottles[5] = {COLORS.EMPTY, COLORS.EMPTY, COLORS.EMPTY, COLORS.EMPTY}
-  gameState.bottles[6] = {COLORS.EMPTY, COLORS.EMPTY, COLORS.EMPTY, COLORS.EMPTY}
-
+  configBottles(1)
+  
   liquidHeight = bottleHeight / 4 -- Each liquid segment height
 
   -- Add button dimensions
@@ -111,12 +109,207 @@ function love.load()
   gameState.popup.particleSystem:setSizes(2, 1, 0)  -- Particles shrink over time
 end
 
-function fillBottleSegment(segment, totalSegments, colour, x, y)
+function configBottles(level)
+  local colours = pickColours(level)
+
+  if level >= 1 and level <= 5 then
+    gameState.totalSegments = 3
+  elseif level >= 6 and level <= 10 then
+    gameState.totalSegments = 4
+  else
+    gameState.totalSegments = 5
+  end
+
+  local colour1 = colours[1]
+  local colour2 = colours[2]
+  local colour3 = colours[3]
+
+  local bottles = {}  
+  for j, color in ipairs(colours) do
+    local bottle = {}
+    for k = 1, gameState.totalSegments do
+      table.insert(bottle, colours[j])
+    end
+    table.insert(bottles, bottle)
+  end
+  table.insert(bottles, {})
+  
+  bottles = shuffleBottles(bottles)
+  
+  gameState.bottles = {}
+  for i, bottle in ipairs(bottles) do
+    gameState.bottles[i] = bottle
+    print("Total segments:", #bottle  , gameState.totalSegments)
+    for j = #bottle + 1, gameState.totalSegments do
+      table.insert(gameState.bottles[i], COLORS.EMPTY)
+    end
+  end
+
+  for i, bottle in ipairs(gameState.bottles) do
+    print(table.concat(bottle, ", "))
+  end
+  -- gameState.bottles = {}
+  -- for j, color in ipairs(colours) do
+  --   local bottle = {}
+  --   for k = 1, gameState.totalSegments do
+  --     table.insert(bottle, colours[j])
+  --   end
+  --   table.insert(gameState.bottles, bottle)
+  -- end
+  -- local emptyBottle = {}
+  -- for k = 1, gameState.totalSegments do
+  --   table.insert(emptyBottle, COLORS.EMPTY)
+  -- end
+  -- table.insert(gameState.bottles, emptyBottle)
+
+  -- gameState.bottles[1] = { colour1, colour2, colour1 }
+  -- gameState.bottles[2] = { colour2, colour2, colour3 }
+  -- gameState.bottles[3] = { colour3, colour3, colour1 }
+  -- gameState.bottles[4] = { COLORS.EMPTY, COLORS.EMPTY, COLORS.EMPTY }
+
+  -- gameState.bottles[1] = {colour1, colour2, colour3, COLORS.EMPTY}
+  -- gameState.bottles[2] = {colour1, colour2, colour3, colour2}
+  -- gameState.bottles[3] = {colour3, colour1, COLORS.EMPTY, COLORS.EMPTY}
+  -- gameState.bottles[4] = {colour2, COLORS.EMPTY, COLORS.EMPTY, COLORS.EMPTY}
+  -- gameState.bottles[5] = {COLORS.EMPTY, COLORS.EMPTY, COLORS.EMPTY, COLORS.EMPTY}
+  -- gameState.bottles[6] = {COLORS.EMPTY, COLORS.EMPTY, COLORS.EMPTY, COLORS.EMPTY}  
+end
+
+function shuffleBottles(bottles)  
+  for _ = 1, 500 do
+    -- find all bottles with space
+    local hasSpace = {}
+    for i, bottle in ipairs(bottles) do
+      if #bottle < gameState.totalSegments then
+        table.insert(hasSpace, i)
+      end
+    end
+
+    -- find all bottles with liquid
+    local hasLiquid = {}
+    for i, bottle in ipairs(bottles) do
+      if #bottle > 0 then
+        table.insert(hasLiquid, i)
+      end
+    end
+    
+    local source = hasLiquid[love.math.random(1, #hasLiquid)]
+    
+    -- does Lua not have a way to remove an element by value??
+    local destOptions = {}
+    for i = 1, #hasSpace do
+      if hasSpace[i] ~= sourceIndex then
+        table.insert(destOptions, hasSpace[i])
+      end
+    end
+
+    local dest = destOptions[love.math.random(1, #destOptions)]
+    
+    local colour = table.remove(bottles[source])
+    table.insert(bottles[dest], colour)
+  end
+
+  validConfig(bottles)
+    
+  return bottles
+end
+
+function validConfig(bottles)
+  -- I /think/ so long as you have a move that changes the top colours,
+  -- it's probably valid?
+  local moves = possibleMoves(bottles)
+
+  print("Valid moves:")
+  for _, move in ipairs(moves) do
+    print("From bottle " .. move[1] .. " to bottle " .. move[2])
+  end
+end
+
+function possibleMoves(bottles)
+  local possibleMoves = {}  -- Initialize the table
+  for i, bottle in ipairs(bottles) do
+    local moves = possibleMovesForBottle(bottles, i)    
+    for _, move in ipairs(moves) do
+      table.insert(possibleMoves, move)
+    end
+  end  
+
+  return possibleMoves
+end
+
+function possibleMovesForBottle(bottles, sourceIdx)
+  local moves = {}
+  if bottles[sourceIdx] == 0 then
+    return moves
+  end
+
+  local sourceColour = bottles[sourceIdx][#bottles[sourceIdx]]
+
+  for i, bottle in ipairs(bottles) do
+    if i ~= sourceIdx then
+      if #bottles[i] == 0 then
+        table.insert(moves, {sourceIdx, i})      
+      elseif bottles[i][#bottles[i]] == sourceColour and #bottles[i] < gameState.totalSegments then
+        table.insert(moves, {sourceIdx, i})
+      end
+    end
+  end
+  
+  return moves
+end
+
+function copyBottles(bottles)
+  local copy = {}
+  for i, bottle in ipairs(bottles) do
+    copy[i] = {}
+    for j, colour in ipairs(bottle) do
+      copy[i][j] = colour
+    end
+  end
+  
+  return copy
+end
+
+function pickColours(level)
+  -- Determine number of colors based on level
+  local numColours
+  if level <= 5 then
+    numColours = 3
+  elseif level <= 10 then
+    numColours = 4
+  else
+    numColours = 5
+  end
+
+  -- Create array of available colors (excluding EMPTY)
+  local availableColours = {
+    COLORS.RED,
+    COLORS.GREEN, 
+    COLORS.BLUE,
+    COLORS.PURPLE,
+    COLORS.ORANGE
+  }
+
+  -- Randomly select colors for this level
+  local levelColours = {}
+  for i = 1, numColours do
+    -- Pick random index from remaining colours
+    local randIndex = love.math.random(1, #availableColours)
+    -- Add the color to our level colours
+    table.insert(levelColours, availableColours[randIndex])
+    -- Remove it from available colors
+    table.remove(availableColours, randIndex)
+  end
+
+  return levelColours
+end
+
+function fillBottleSegment(segment, colour, x, y)
   -- Create a quad for the bottom third of the mask
   local maskWidth = gameState.assets.bottleMask:getWidth()
   local maskHeight = gameState.assets.bottleMask:getHeight()
-  local segmentHeight = maskHeight / totalSegments
-  local segmentY = (totalSegments - segment) * segmentHeight
+  local segmentHeight = maskHeight / gameState.totalSegments
+  local segmentY = (gameState.totalSegments - segment) * segmentHeight
   local segmentQuad =
     love.graphics.newQuad(
     0, -- x position in source image
@@ -127,19 +320,14 @@ function fillBottleSegment(segment, totalSegments, colour, x, y)
     maskHeight -- total height of source image
   )
 
-  if (colour == COLORS.RED) then
-    love.graphics.setColor(1, 0, 0, 0.5) -- Semi-transparent red
-  elseif (colour == COLORS.GREEN) then
-    love.graphics.setColor(0, 1, 0, 0.5) -- Semi-transparent green
-  elseif (colour == COLORS.BLUE) then
-    love.graphics.setColor(0, 0, 1, 0.5) -- Semi-transparent blue
-  end
-
+  local r, g, b = colourToRGB(colour)
+  love.graphics.setColor(r, g, b, 0.5)    
+ 
   love.graphics.draw(
     gameState.assets.liquidMask,
     segmentQuad,
     x,
-    y + (bottleHeight * (totalSegments - segment) / totalSegments),
+    y + (bottleHeight * (gameState.totalSegments - segment) / gameState.totalSegments),
     0,
     gameState.assets.bottleScale.x,
     gameState.assets.bottleScale.y
@@ -154,7 +342,7 @@ function drawBottle(bottle, x, y, bottleNum)
 
   for j, color in ipairs(bottle) do
     if color ~= COLORS.EMPTY then
-      fillBottleSegment(j, 4, color, x, y)
+      fillBottleSegment(j, color, x, y)
     end
   end
 
@@ -168,6 +356,20 @@ function drawBottle(bottle, x, y, bottleNum)
     gameState.assets.bottleScale.x,
     gameState.assets.bottleScale.y
   )
+end
+
+function colourToRGB(colour)
+  if colour == COLORS.RED then
+    return 1, 0, 0
+  elseif colour == COLORS.GREEN then
+    return 0, 1, 0
+  elseif colour == COLORS.BLUE then
+    return 0, 0, 1
+  elseif colour == COLORS.PURPLE then
+    return 1, 0, 1
+  elseif colour == COLORS.ORANGE then
+    return 1, 0.5, 0
+  end
 end
 
 function love.draw()
@@ -353,6 +555,7 @@ function getEmptySpaces(bottle)
       count = count + 1
     end
   end
+
   return count
 end
 
