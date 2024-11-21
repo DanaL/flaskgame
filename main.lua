@@ -16,7 +16,10 @@ local gameState = {
     duration = 4,  -- How long to show popup
     particleSystem = nil
   },
-  bubbles = {}
+  bubbles = {},
+  currentScreen = "splash",
+  splashTimer = 0,
+  splashDuration = 5
 }
 
 local clickedButton = ""
@@ -33,8 +36,15 @@ local COLORS = {
   ORANGE = 5
 }
 
+-- Add this near the top with other game state variables
+local backgroundTheme = {
+  top = {r = 0, g = 0, b = 0},
+  bottom = {r = 0, g = 0, b = 0}
+}
+
 function love.load()
-  love.window.setTitle("Untitled Liquid Puzzle Game")
+  love.window.setTitle("Pour Decisions 1.0.0")
+  gameState.splashImage = love.graphics.newImage("assets/images/splashscreen.png")
 
   backgroundMusic = love.audio.newSource("assets/music/soundtrack01.mp3", "stream")
   backgroundMusic:setLooping(true) 
@@ -47,8 +57,6 @@ function love.load()
     popupSmall = love.graphics.newFont("assets/fonts/slkscr.ttf", 36) 
   }
   love.graphics.setFont(gameState.fonts.regular)
-
-  love.graphics.setBackgroundColor(0.67, 0.85, 0.9, 0.5)
 
   -- Initialize game state
   BottleWidth = 100
@@ -105,6 +113,26 @@ function love.load()
     1, 0, 1, 1     -- Purple
   )
   gameState.popup.particleSystem:setSizes(2, 1, 0)  -- Particles shrink over time
+
+  local themes = {
+    {  -- Blue gradient
+      top = {r = 0.9, g = 0.95, b = 1},    -- Very light blue
+      bottom = {r = 1, g = 0.92, b = 0.99} -- Slightly darker soft blue
+    },
+    {  -- Peach gradient
+      top = {r = 0.98, g = 0.95, b = 0.9},    -- Very light peach
+      bottom = {r = 0.95, g = 0.9, b = 0.92}   -- Soft pink-beige
+    },
+    {  -- Green gradient
+      top = {r = 0.9, g = 0.98, b = 0.95},    -- Very light mint
+      bottom = {r = 0.75, g = 0.95, b = 0.9}   -- Soft green-white
+    }
+  }
+  
+  -- Select random theme
+  local selectedTheme = themes[love.math.random(1, #themes)]
+  backgroundTheme.top = selectedTheme.top
+  backgroundTheme.bottom = selectedTheme.bottom
 end
 
 function SetNewBottleConfig(level)
@@ -360,6 +388,37 @@ function XOffset()
 end
 
 function love.draw()
+  love.graphics.clear()
+  local width = love.graphics.getWidth()
+  local height = love.graphics.getHeight()
+
+  -- Use the selected theme colors
+  love.graphics.setColor(backgroundTheme.top.r, backgroundTheme.top.g, backgroundTheme.top.b, 1)
+  love.graphics.rectangle("fill", 0, 0, width, height/2)
+  
+  love.graphics.setColor(backgroundTheme.bottom.r, backgroundTheme.bottom.g, backgroundTheme.bottom.b, 1)
+  love.graphics.rectangle("fill", 0, height/2, width, height/2)
+  
+  -- Smooth blend between the two colors
+  for i = 1, 20 do
+    local alpha = i / 20
+    local y = (height/2) - (100 * (1-alpha))
+    love.graphics.setColor(
+      backgroundTheme.bottom.r,
+      backgroundTheme.bottom.g,
+      backgroundTheme.bottom.b,
+      alpha
+    )
+    love.graphics.rectangle("fill", 0, y, width, 10)
+  end
+  
+  love.graphics.setColor(1, 1, 1, 1)
+
+  if gameState.currentScreen == "splash" then
+    love.graphics.draw(gameState.splashImage, 0, 0)
+    return
+  end
+
   -- Make sure we reset to white color at the start of draw
   love.graphics.setColor(1, 1, 1)
   love.graphics.setFont(gameState.fonts.regular)
@@ -471,6 +530,11 @@ function SetupBubbleArray()
 end
 
 function love.mousepressed(x, y, button)
+  if gameState.currentScreen == "splash" then
+    gameState.currentScreen = "game"
+    return
+  end
+
   if gameState.popup.active then
     gameState.popup.active = false
     victorySound:stop()
@@ -692,6 +756,18 @@ function ShowWinPopup()
 end
 
 function love.update(dt)
+  if gameState.currentScreen == "splash" then
+    gameState.splashTimer = gameState.splashTimer + dt
+    if gameState.splashTimer >= gameState.splashDuration then
+      gameState.currentScreen = "game"
+
+      if isMusicPlaying then
+        backgroundMusic:play()
+      end
+    end
+    return
+  end
+
   -- Update popup
   if gameState.popup.active then
     gameState.popup.particleSystem:update(dt)
