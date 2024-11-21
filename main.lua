@@ -336,6 +336,10 @@ function DrawButton(button, text)
   love.graphics.printf(text, button.x, button.y + 12, button.width, "center")
 end
 
+function XOffset()
+  return (love.graphics.getWidth() - 125 * #gameState.bottles) / 2
+end
+
 function love.draw()
   -- Make sure we reset to white color at the start of draw
   love.graphics.setColor(1, 1, 1)
@@ -348,7 +352,7 @@ function love.draw()
   love.graphics.setColor(1, 1, 1)
 
   for i, bottle in ipairs(gameState.bottles) do
-    local x = 25 + (i - 1) * 125
+    local x = XOffset() + (i - 1) * 125
     local y = 225
     drawBottle(bottle, x, y, i)
   end
@@ -444,7 +448,7 @@ function love.mousepressed(x, y, button)
   local bottleClicked = false
   -- Check if a bottle was clicked
   for i, bottle in ipairs(gameState.bottles) do
-    local bx = 25 + (i - 1) * 125
+    local bx = XOffset() + (i - 1) * 125
     local by = 225
 
     if x >= bx and x <= bx + BottleWidth and y >= by and y <= by + BottleHeight then
