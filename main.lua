@@ -752,7 +752,9 @@ function ShowWinPopup()
   gameState.popup.particleSystem:reset()
   gameState.popup.particleSystem:emit(200)
 
-  victorySound:play()
+  if isMusicPlaying then
+    victorySound:play()
+  end
 end
 
 function love.update(dt)
