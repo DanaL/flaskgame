@@ -21,6 +21,7 @@ local gameState = {
 
 local clickedButton = ""
 local winningMovesCount = 0
+local isMusicPlaying = true
 
 -- Add at the start of your file, before love.load()
 local COLORS = {
@@ -34,6 +35,12 @@ local COLORS = {
 
 function love.load()
   love.window.setTitle("Untitled Liquid Puzzle Game")
+
+  backgroundMusic = love.audio.newSource("assets/music/soundtrack01.mp3", "stream")
+  backgroundMusic:setLooping(true) 
+  backgroundMusic:setVolume(0.2)
+  backgroundMusic:play()    
+
   gameState.fonts = {
     regular = love.graphics.newFont("assets/fonts/slkscr.ttf", 18),
     popup = love.graphics.newFont("assets/fonts/slkscr.ttf", 48), 
@@ -77,8 +84,9 @@ function love.load()
   
   liquidHeight = BottleHeight / 4 -- Each liquid segment height
 
-  ResetButton = { x = 225, y = 50, width = 100, height = 40 }
   NewGameButton = { x = 50, y = 50, width = 150, height = 40 }
+  ResetButton = { x = 225, y = 50, width = 100, height = 40 }
+  MusicButton = { x = 600, y = 50, width = 150, height = 40 }
 
   bottleClink = love.audio.newSource("assets/sounds/clink.mp3", "static")
   bottleClink:setVolume(0.75)
@@ -358,6 +366,7 @@ function love.draw()
 
   DrawButton(ResetButton, "Reset")
   DrawButton(NewGameButton, "New Game")
+  DrawButton(MusicButton, isMusicPlaying and "Music: On" or "Music: Off")
   DrawLevelLabel()
 
   -- Make sure we reset to white before drawing bottles
@@ -479,6 +488,15 @@ function love.mousepressed(x, y, button)
     gameState.moves = 0
     ResetLevel()
     clickedButton = "New Game"
+    return
+  elseif WasButtonClicked(MusicButton, x, y) then
+    isMusicPlaying = not isMusicPlaying
+    if isMusicPlaying then
+      backgroundMusic:play()
+    else
+      backgroundMusic:pause()
+    end
+    clickedButton = "Music"
     return
   end
 
