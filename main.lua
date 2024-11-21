@@ -316,7 +316,7 @@ function colourToRGB(colour)
   elseif colour == COLORS.GREEN then
     return 0, 1, 0
   elseif colour == COLORS.BLUE then
-    return 0, 0, 1
+    return 0, 0.6, 1
   elseif colour == COLORS.PURPLE then
     return 1, 0, 1
   elseif colour == COLORS.ORANGE then
@@ -643,7 +643,6 @@ function love.update(dt)
     -- Check if popup should end
     if love.timer.getTime() - gameState.popup.startTime > gameState.popup.duration then
       gameState.popup.active = false
-      gameState.moves = 0
     end
   end
 end
