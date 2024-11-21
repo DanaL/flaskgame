@@ -566,11 +566,7 @@ function pourLiquid(fromIdx, toIdx)
   local emptySpaces = getEmptySpaces(toBottle)
 
   local canPour = emptySpaces > 0
-  if canPour then
-    local toTopColour, _ = getTopColour(toBottle)
-    canPour = toTopColour == COLORS.EMPTY or toTopColour == topColour
-  end
-
+  
   if canPour then
     gameState.moves = gameState.moves + 1
     local amountToPour = math.min(colourCount, emptySpaces)
