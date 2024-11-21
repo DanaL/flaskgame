@@ -12,8 +12,6 @@ local gameState = {
     text = "",
     colors = {},
     particles = {},
-    startTime = 0,
-    duration = 4,  -- How long to show popup
     particleSystem = nil
   },
   bubbles = {},
@@ -746,8 +744,7 @@ end
 function ShowWinPopup()
   gameState.popup.active = true
   gameState.popup.text = "Level Complete!"
-  gameState.popup.startTime = love.timer.getTime()
-
+  
   -- Reset and emit particles
   gameState.popup.particleSystem:reset()
   gameState.popup.particleSystem:emit(200)
@@ -773,11 +770,6 @@ function love.update(dt)
   -- Update popup
   if gameState.popup.active then
     gameState.popup.particleSystem:update(dt)
-  
-    -- Check if popup should end
-    if love.timer.getTime() - gameState.popup.startTime > gameState.popup.duration then
-      gameState.popup.active = false
-    end
   end
 
   -- Do we want to create any bubbles?
