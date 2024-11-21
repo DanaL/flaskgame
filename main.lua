@@ -1,5 +1,5 @@
 local gameState = {
-  level = 8,
+  level = 1,
   moves = 0,
   bottles = {},
   selectedBottle = nil,
@@ -19,6 +19,7 @@ local gameState = {
 }
 
 local clickedButton = ""
+local winningMovesCount = 0
 
 -- Add at the start of your file, before love.load()
 local COLORS = {
@@ -98,7 +99,7 @@ function love.load()
   gameState.popup.particleSystem:setSizes(2, 1, 0)  -- Particles shrink over time
 end
 
-function SetNewBottleConfig(level)
+function SetNewBottleConfig(level)  
   local colours = pickColours(level)
 
   if level >= 1 and level <= 5 then
@@ -183,7 +184,7 @@ function possibleMoves(bottles)
     for _, move in ipairs(moves) do
       table.insert(possibleMoves, move)
     end
-  end  
+  end
 
   return possibleMoves
 end
@@ -332,8 +333,16 @@ function DrawButton(button, text)
   love.graphics.rectangle("fill", button.x, button.y, button.width, button.height)
   love.graphics.setColor(1, 1, 1)
   love.graphics.rectangle("line", button.x, button.y, button.width, button.height)
-  love.graphics.setColor(1, 1, 1) 
+  love.graphics.setColor(1, 1, 1)
   love.graphics.printf(text, button.x, button.y + 12, button.width, "center")
+end
+
+function DrawLevelLabel()
+  love.graphics.setColor(0, 0, 0)
+  local text = "Level: " .. gameState.level
+  love.graphics.setFont(gameState.fonts.popup)
+  love.graphics.printf(text, 50, 115, 400, "left")
+  love.graphics.setFont(gameState.fonts.regular)
 end
 
 function XOffset()
@@ -347,6 +356,7 @@ function love.draw()
 
   DrawButton(ResetButton, "Reset")
   DrawButton(NewGameButton, "New Game")
+  DrawLevelLabel()
 
   -- Make sure we reset to white before drawing bottles
   love.graphics.setColor(1, 1, 1)
@@ -400,7 +410,7 @@ function love.draw()
     love.graphics.setFont(gameState.fonts.popupSmall)
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.print(
-      "Completed in " .. gameState.moves .. " moves!", 
+      "Completed in " .. winningMovesCount .. " moves!", 
       x, 
       y + textHeight + 20
     )
@@ -440,6 +450,7 @@ function love.mousepressed(x, y, button)
   elseif WasButtonClicked(NewGameButton, x, y) then
     SetNewBottleConfig(1)
     gameState.level = 1
+    gameState.moves = 0
     ResetLevel()
     clickedButton = "New Game"
     return
@@ -604,19 +615,23 @@ function checkWin()
   end
   
   -- If we get here, player has won
-  showWinPopup()
+  ShowWinPopup()
+  gameState.level = gameState.level + 1
+  winningMovesCount = gameState.moves
+  SetNewBottleConfig(gameState.level)
+  gameState.moves = 0
   return true
 end
 
-function showWinPopup()
+function ShowWinPopup()
   gameState.popup.active = true
   gameState.popup.text = "Level Complete!"
   gameState.popup.startTime = love.timer.getTime()
-  
+
   -- Reset and emit particles
   gameState.popup.particleSystem:reset()
   gameState.popup.particleSystem:emit(200)
-  
+
   victorySound:play()
 end
 
@@ -624,10 +639,11 @@ function love.update(dt)
   -- Update popup
   if gameState.popup.active then
     gameState.popup.particleSystem:update(dt)
-    
+  
     -- Check if popup should end
     if love.timer.getTime() - gameState.popup.startTime > gameState.popup.duration then
       gameState.popup.active = false
+      gameState.moves = 0
     end
   end
 end
