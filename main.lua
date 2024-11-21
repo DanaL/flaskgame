@@ -15,7 +15,8 @@ local gameState = {
     startTime = 0,
     duration = 4,  -- How long to show popup
     particleSystem = nil
-  }
+  },
+  bubbles = {}
 }
 
 local clickedButton = ""
@@ -72,7 +73,6 @@ function love.load()
 
   gameState.assets.bottleMaskData = love.image.newImageData("assets/sprites/bottle_mask.png")
 
-  -- Create some test bottles with different colored liquids
   SetNewBottleConfig(gameState.level)
   
   liquidHeight = BottleHeight / 4 -- Each liquid segment height
@@ -99,7 +99,7 @@ function love.load()
   gameState.popup.particleSystem:setSizes(2, 1, 0)  -- Particles shrink over time
 end
 
-function SetNewBottleConfig(level)  
+function SetNewBottleConfig(level)
   local colours = pickColours(level)
 
   if level >= 1 and level <= 5 then
@@ -138,6 +138,8 @@ function SetNewBottleConfig(level)
       initialBottles[i][j] = color
     end
   end
+
+  SetupBubbleArray()
 end
 
 function ShuffleBottles(bottles)
@@ -415,6 +417,14 @@ function love.draw()
       y + textHeight + 20
     )
   end
+
+  -- Draw bubbles
+  for i, bubble in ipairs(gameState.bubbles) do
+    if bubble.particle ~= nil then
+      love.graphics.setColor(1, 1, 1)
+      love.graphics.draw(bubble.particle, bubble.x, 500)
+    end
+  end
 end
 
 function WasButtonClicked(button, x, y)
@@ -433,6 +443,22 @@ function ResetLevel()
     end
   end
   gameState.selectedBottle = nil
+
+  SetupBubbleArray()
+end
+
+function SetupBubbleArray()
+  gameState.bubbles = {}
+  for i = 1, #gameState.bottles do
+    local bubble = {
+      x = -1,
+      topY = -1,
+      nextBubble = love.timer.getTime() + love.math.random(5, 10),
+      active = false,
+      particle = nil
+    }
+    table.insert(gameState.bubbles, bubble)
+  end
 end
 
 function love.mousepressed(x, y, button)
@@ -471,11 +497,14 @@ function love.mousepressed(x, y, button)
           localY < gameState.assets.bottleMaskData:getHeight()
        then
         local r, g, b, a = gameState.assets.bottleMaskData:getPixel(localX, localY)
-        if a > 0.5 then          
-          bottleClicked = true          
+        if a > 0.5 then
+          bottleClicked = true
+
+          CancelBubble(i)
+          
           if gameState.selectedBottle == nil then
             -- Only select if bottle isn't empty
-            if not isBottleEmpty(bottle) then
+            if not IsBottleEmpty(bottle) then
               gameState.selectedBottle = i
               local clink = bottleClink:clone()
               clink:play()
@@ -499,7 +528,16 @@ function love.mousepressed(x, y, button)
   end
 end
 
-function isBottleEmpty(bottle)
+function CancelBubble(bottleNum)
+  local bubble = gameState.bubbles[bottleNum]
+  if bubble.particle ~= nil then
+    bubble.particle = nil
+    bubble.active = false
+    bubble.nextBubble = love.timer.getTime() + math.random(5, 10)
+  end
+end
+
+function IsBottleEmpty(bottle)
   for _, colour in ipairs(bottle) do
     if colour ~= COLORS.EMPTY then
       return false
@@ -592,7 +630,7 @@ function checkWin()
   -- 1. Is completely empty, or
   -- 2. Contains all segments of one color
   for _, bottle in ipairs(gameState.bottles) do
-    if not isBottleEmpty(bottle) then
+    if not IsBottleEmpty(bottle) then
       local bottleColor = nil
       local segmentCount = 0
       
@@ -645,6 +683,57 @@ function love.update(dt)
       gameState.popup.active = false
     end
   end
+
+  -- Do we want to create any bubbles?
+  for i, bubble in ipairs(gameState.bubbles) do
+    local time = love.timer.getTime()
+    local bottle = gameState.bottles[i]
+    if bubble.active then
+      bubble.particle:update(dt)
+    elseif not IsBottleEmpty(bottle) and time > bubble.nextBubble then
+      CreateNewBubbleParticle(bubble, i)
+      bubble.active = true
+    end
+  end
+end
+
+function CreateNewBubbleParticle(bubble, bottleNum)
+  local offsetX = love.math.random(-15, 15)
+  bubble.x =  XOffset() + (bottleNum - 1) * 125 + BottleWidth / 2 + love.math.random(-15, 15)
+
+  local emptyCount = getEmptySpaces(gameState.bottles[bottleNum])
+
+  local fillRatio = (gameState.totalSegments - emptyCount) / gameState.totalSegments
+  
+  local baseLifetime = 2
+  local minLifetime = baseLifetime * fillRatio
+  local maxLifetime = minLifetime + 1  -- Add a small random variance
+
+  local liquidTopY = 225 + (BottleHeight * emptyCount / gameState.totalSegments)  -- 225 is the bottle's Y position
+  local distance = 500 - liquidTopY
+
+  local xAccel = 0
+  if offsetX < -10 then
+    xAccel = 25  -- Push right if too far left
+  elseif offsetX > 10 then
+    xAccel = -25  -- Push left if too far right
+  else
+    xAccel = love.math.random(-10, 10)  -- Small random drift if near center
+  end
+  local particleImg = love.graphics.newImage("assets/sprites/particle.png")
+  bubble.particle = love.graphics.newParticleSystem(particleImg, 1)
+  bubble.particle:setParticleLifetime(minLifetime, maxLifetime)
+  bubble.particle:setEmissionRate(1)
+  bubble.particle:setSizes(0.7, 0.5)
+
+  bubble.particle:setLinearAcceleration(xAccel, -distance, xAccel, -distance * 1.2) -- Move upward
+  bubble.particle:setLinearDamping(0.8)
+  --bubble.particle:setRelativePosition(0, liquidTopY - 500)  -- Relative to particle system position
+  
+  bubble.particle:setColors(
+    1, 1, 1, 0.8,  -- Start color (white with 80% opacity)
+    1, 1, 1, 0     -- End color (fade to transparent)
+  )
 end
 
 -- Helper function to convert HSV to RGB
