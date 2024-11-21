@@ -1,4 +1,5 @@
 local gameState = {
+  level = 8,
   moves = 0,
   bottles = {},
   selectedBottle = nil,
@@ -16,6 +17,8 @@ local gameState = {
     particleSystem = nil
   }
 }
+
+local clickedButton = ""
 
 -- Add at the start of your file, before love.load()
 local COLORS = {
@@ -39,20 +42,20 @@ function love.load()
   love.graphics.setBackgroundColor(0.67, 0.85, 0.9, 0.5)
 
   -- Initialize game state
-  bottleWidth = 100
-  bottleHeight = 300
+  BottleWidth = 100
+  BottleHeight = 300
 
   gameState.assets.bottleImage = love.graphics.newImage("assets/sprites/bottle.png")
   gameState.assets.bottleImage:setFilter("nearest", "nearest")
   gameState.assets.bottleScale = {
-    x = bottleWidth / gameState.assets.bottleImage:getWidth(),
-    y = bottleHeight / gameState.assets.bottleImage:getHeight()
+    x = BottleWidth / gameState.assets.bottleImage:getWidth(),
+    y = BottleHeight / gameState.assets.bottleImage:getHeight()
   }
 
   gameState.assets.bottleMask = love.graphics.newImage("assets/sprites/bottle_mask.png")
   gameState.assets.bottleMask:setFilter("nearest", "nearest")
   
-  gameState.assets.liquidMask = love.graphics.newCanvas(bottleWidth, bottleHeight)
+  gameState.assets.liquidMask = love.graphics.newCanvas(BottleWidth, BottleHeight)
   love.graphics.setCanvas(gameState.assets.liquidMask)
   love.graphics.clear()
   love.graphics.setColor(1, 1, 1)
@@ -69,31 +72,17 @@ function love.load()
   gameState.assets.bottleMaskData = love.image.newImageData("assets/sprites/bottle_mask.png")
 
   -- Create some test bottles with different colored liquids
-  configBottles(1)
+  SetNewBottleConfig(gameState.level)
   
-  liquidHeight = bottleHeight / 4 -- Each liquid segment height
+  liquidHeight = BottleHeight / 4 -- Each liquid segment height
 
-  -- Add button dimensions
-  resetButton = {
-    x = 50,
-    y = 50,
-    width = 100,
-    height = 40
-  }
+  ResetButton = { x = 225, y = 50, width = 100, height = 40 }
+  NewGameButton = { x = 50, y = 50, width = 150, height = 40 }
 
   bottleClink = love.audio.newSource("assets/sounds/clink.mp3", "static")
   bottleClink:setVolume(0.75)
   plopSound = love.audio.newSource("assets/sounds/plop.mp3", "static")
   victorySound = love.audio.newSource("assets/sounds/victory.mp3", "static")
-
-  -- Store initial bottle state
-  initialBottles = {}
-  for i, bottle in ipairs(gameState.bottles) do
-    initialBottles[i] = {}
-    for j, color in ipairs(bottle) do
-      initialBottles[i][j] = color
-    end
-  end
 
   -- Initialize particle system for the win effect
   local particleImg = love.graphics.newImage("assets/sprites/particle.png")  -- Create a small white circle image
@@ -109,7 +98,7 @@ function love.load()
   gameState.popup.particleSystem:setSizes(2, 1, 0)  -- Particles shrink over time
 end
 
-function configBottles(level)
+function SetNewBottleConfig(level)
   local colours = pickColours(level)
 
   if level >= 1 and level <= 5 then
@@ -120,12 +109,8 @@ function configBottles(level)
     gameState.totalSegments = 5
   end
 
-  local colour1 = colours[1]
-  local colour2 = colours[2]
-  local colour3 = colours[3]
-
-  local bottles = {}  
-  for j, color in ipairs(colours) do
+  local bottles = {}
+  for j = 1, #colours do
     local bottle = {}
     for k = 1, gameState.totalSegments do
       table.insert(bottle, colours[j])
@@ -133,49 +118,28 @@ function configBottles(level)
     table.insert(bottles, bottle)
   end
   table.insert(bottles, {})
-  
-  bottles = shuffleBottles(bottles)
-  
+
+  bottles = ShuffleBottles(bottles)
+
   gameState.bottles = {}
   for i, bottle in ipairs(bottles) do
     gameState.bottles[i] = bottle
-    print("Total segments:", #bottle  , gameState.totalSegments)
     for j = #bottle + 1, gameState.totalSegments do
       table.insert(gameState.bottles[i], COLORS.EMPTY)
     end
   end
 
+  -- Store initial bottle state
+  initialBottles = {}
   for i, bottle in ipairs(gameState.bottles) do
-    print(table.concat(bottle, ", "))
+    initialBottles[i] = {}
+    for j, color in ipairs(bottle) do
+      initialBottles[i][j] = color
+    end
   end
-  -- gameState.bottles = {}
-  -- for j, color in ipairs(colours) do
-  --   local bottle = {}
-  --   for k = 1, gameState.totalSegments do
-  --     table.insert(bottle, colours[j])
-  --   end
-  --   table.insert(gameState.bottles, bottle)
-  -- end
-  -- local emptyBottle = {}
-  -- for k = 1, gameState.totalSegments do
-  --   table.insert(emptyBottle, COLORS.EMPTY)
-  -- end
-  -- table.insert(gameState.bottles, emptyBottle)
-
-  -- gameState.bottles[1] = { colour1, colour2, colour1 }
-  -- gameState.bottles[2] = { colour2, colour2, colour3 }
-  -- gameState.bottles[3] = { colour3, colour3, colour1 }
-  -- gameState.bottles[4] = { COLORS.EMPTY, COLORS.EMPTY, COLORS.EMPTY }
-
-  -- gameState.bottles[1] = {colour1, colour2, colour3, COLORS.EMPTY}
-  -- gameState.bottles[2] = {colour1, colour2, colour3, colour2}
-  -- gameState.bottles[3] = {colour3, colour1, COLORS.EMPTY, COLORS.EMPTY}
-  -- gameState.bottles[4] = {colour2, COLORS.EMPTY, COLORS.EMPTY, COLORS.EMPTY}
-  -- gameState.bottles[5] = {COLORS.EMPTY, COLORS.EMPTY, COLORS.EMPTY, COLORS.EMPTY}
-  -- gameState.bottles[6] = {COLORS.EMPTY, COLORS.EMPTY, COLORS.EMPTY, COLORS.EMPTY}  
 end
 
-function shuffleBottles(bottles)  
+function ShuffleBottles(bottles)
   for _ = 1, 500 do
     -- find all bottles with space
     local hasSpace = {}
@@ -209,20 +173,7 @@ function shuffleBottles(bottles)
     table.insert(bottles[dest], colour)
   end
 
-  validConfig(bottles)
-    
   return bottles
-end
-
-function validConfig(bottles)
-  -- I /think/ so long as you have a move that changes the top colours,
-  -- it's probably valid?
-  local moves = possibleMoves(bottles)
-
-  print("Valid moves:")
-  for _, move in ipairs(moves) do
-    print("From bottle " .. move[1] .. " to bottle " .. move[2])
-  end
 end
 
 function possibleMoves(bottles)
@@ -284,7 +235,7 @@ function pickColours(level)
   -- Create array of available colors (excluding EMPTY)
   local availableColours = {
     COLORS.RED,
-    COLORS.GREEN, 
+    COLORS.GREEN,
     COLORS.BLUE,
     COLORS.PURPLE,
     COLORS.ORANGE
@@ -321,13 +272,13 @@ function fillBottleSegment(segment, colour, x, y)
   )
 
   local r, g, b = colourToRGB(colour)
-  love.graphics.setColor(r, g, b, 0.5)    
+  love.graphics.setColor(r, g, b, 0.5)
  
   love.graphics.draw(
     gameState.assets.liquidMask,
     segmentQuad,
     x,
-    y + (bottleHeight * (gameState.totalSegments - segment) / gameState.totalSegments),
+    y + (BottleHeight * (gameState.totalSegments - segment) / gameState.totalSegments),
     0,
     gameState.assets.bottleScale.x,
     gameState.assets.bottleScale.y
@@ -337,7 +288,7 @@ end
 function drawBottle(bottle, x, y, bottleNum)
   if gameState.selectedBottle == bottleNum then
     x = x + 10
-    y = y - 10    
+    y = y - 10
   end
 
   for j, color in ipairs(bottle) do
@@ -372,18 +323,26 @@ function colourToRGB(colour)
   end
 end
 
+function DrawButton(button, text)
+  if love.mouse.isDown(1) and text == clickedButton then
+    love.graphics.setColor(0.18, 0.31, 0.31)
+  else
+    love.graphics.setColor(0.5, 0.5, 0.5)
+  end
+  love.graphics.rectangle("fill", button.x, button.y, button.width, button.height)
+  love.graphics.setColor(1, 1, 1)
+  love.graphics.rectangle("line", button.x, button.y, button.width, button.height)
+  love.graphics.setColor(1, 1, 1) 
+  love.graphics.printf(text, button.x, button.y + 12, button.width, "center")
+end
+
 function love.draw()
   -- Make sure we reset to white color at the start of draw
   love.graphics.setColor(1, 1, 1)
   love.graphics.setFont(gameState.fonts.regular)
 
-  -- Draw reset button with more contrast
-  love.graphics.setColor(0.5, 0.5, 0.5) -- Darker gray for button
-  love.graphics.rectangle("fill", resetButton.x, resetButton.y, resetButton.width, resetButton.height)
-  love.graphics.setColor(1, 1, 1) -- Black for outline
-  love.graphics.rectangle("line", resetButton.x, resetButton.y, resetButton.width, resetButton.height)
-  love.graphics.setColor(1, 1, 1) -- White for text
-  love.graphics.printf("Reset", resetButton.x, resetButton.y + 12, resetButton.width, "center")
+  DrawButton(ResetButton, "Reset")
+  DrawButton(NewGameButton, "New Game")
 
   -- Make sure we reset to white before drawing bottles
   love.graphics.setColor(1, 1, 1)
@@ -403,8 +362,8 @@ function love.draw()
     -- Draw particles
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.draw(
-      gameState.popup.particleSystem, 
-      love.graphics.getWidth() / 2, 
+      gameState.popup.particleSystem,
+      love.graphics.getWidth() / 2,
       love.graphics.getHeight() / 2
     )
     
@@ -444,10 +403,22 @@ function love.draw()
   end
 end
 
-function wasResetClicked(x, y)
+function WasButtonClicked(button, x, y)
   return
-    x >= resetButton.x and x <= resetButton.x + resetButton.width 
-    and y >= resetButton.y and y <= resetButton.y + resetButton.height
+    x >= button.x and x <= button.x + button.width 
+    and y >= button.y and y <= button.y + button.height
+end
+
+function ResetLevel()
+  gameState.bottles = {}
+  gameState.moves = 0
+  for i, bottle in ipairs(initialBottles) do
+    gameState.bottles[i] = {}
+    for j, color in ipairs(bottle) do
+      gameState.bottles[i][j] = color
+    end
+  end
+  gameState.selectedBottle = nil
 end
 
 function love.mousepressed(x, y, button)
@@ -457,18 +428,16 @@ function love.mousepressed(x, y, button)
     return
   end
 
-  -- Check if reset button was clicked
-  if wasResetClicked(x, y) then
-    -- Reset game state
-    gameState.bottles = {}
-    gameState.moves = 0
-    for i, bottle in ipairs(initialBottles) do
-      gameState.bottles[i] = {}
-      for j, color in ipairs(bottle) do
-        gameState.bottles[i][j] = color
-      end
-    end
-    gameState.selectedBottle = nil
+  clickedButton = ""
+  if WasButtonClicked(ResetButton, x, y) then
+    ResetLevel()
+    clickedButton = "Reset"
+    return
+  elseif WasButtonClicked(NewGameButton, x, y) then
+    SetNewBottleConfig(1)
+    gameState.level = 1
+    ResetLevel()
+    clickedButton = "New Game"
     return
   end
 
@@ -478,7 +447,7 @@ function love.mousepressed(x, y, button)
     local bx = 25 + (i - 1) * 125
     local by = 225
 
-    if x >= bx and x <= bx + bottleWidth and y >= by and y <= by + bottleHeight then
+    if x >= bx and x <= bx + BottleWidth and y >= by and y <= by + BottleHeight then
       local localX = math.floor((x - bx) / gameState.assets.bottleScale.x)
       local localY = math.floor((y - by) / gameState.assets.bottleScale.y)
 
