@@ -41,7 +41,7 @@ local backgroundTheme = {
 }
 
 function love.load()
-  love.window.setTitle("Pour Decisions 1.0.0")
+  love.window.setTitle("Pour Decisions 1.0.1")
   gameState.splashImage = love.graphics.newImage("assets/images/splashscreen.png")
 
   backgroundMusic = love.audio.newSource("assets/music/soundtrack01.mp3", "stream")
@@ -527,6 +527,12 @@ function SetupBubbleArray()
   end
 end
 
+function GoToNextLevel()
+  gameState.level = gameState.level + 1  
+  SetNewBottleConfig(gameState.level)
+  gameState.moves = 0
+end
+
 function love.mousepressed(x, y, button)
   if gameState.currentScreen == "splash" then
     gameState.currentScreen = "game"
@@ -536,6 +542,7 @@ function love.mousepressed(x, y, button)
   if gameState.popup.active then
     gameState.popup.active = false
     victorySound:stop()
+    GoToNextLevel()
     return
   end
 
@@ -592,7 +599,7 @@ function love.mousepressed(x, y, button)
           else
             -- Try to pour from selected bottle to clicked bottle
             if gameState.selectedBottle ~= i then -- Can't pour into same bottle
-              pourLiquid(gameState.selectedBottle, i)
+              PourLiquid(gameState.selectedBottle, i)
             end
             gameState.selectedBottle = nil
           end
@@ -661,7 +668,7 @@ function getEmptySpaces(bottle)
   return count
 end
 
-function pourLiquid(fromIdx, toIdx)
+function PourLiquid(fromIdx, toIdx)
   local fromBottle = gameState.bottles[fromIdx]
   local toBottle = gameState.bottles[toIdx]
   local topColour, colourCount = getTopColour(fromBottle)
@@ -691,11 +698,11 @@ function pourLiquid(fromIdx, toIdx)
     local plop = plopSound:clone()
     plop:play()
 
-    checkWin()
+    CheckWin()
   end
 end
 
-function checkWin()
+function CheckWin()
   -- First, count how many segments of each color exist
   local colorCounts = {}
   for _, bottle in ipairs(gameState.bottles) do
@@ -734,10 +741,7 @@ function checkWin()
   
   -- If we get here, player has won
   ShowWinPopup()
-  gameState.level = gameState.level + 1
   winningMovesCount = gameState.moves
-  SetNewBottleConfig(gameState.level)
-  gameState.moves = 0
   return true
 end
 
