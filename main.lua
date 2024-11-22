@@ -40,8 +40,16 @@ local backgroundTheme = {
   bottom = {r = 0, g = 0, b = 0}
 }
 
+local wasPlayingBeforeFocusLoss = false
+local audioSources = {
+  backgroundMusic = backgroundMusic,
+  bottleClink = bottleClink,
+  plopSound = plopSound,
+  victorySound = victorySound
+}
+
 function love.load()
-  love.window.setTitle("Pour Decisions 1.0.1")
+  love.window.setTitle("Pour Decisions 1.0.3")
   gameState.splashImage = love.graphics.newImage("assets/images/splashscreen.png")
 
   backgroundMusic = love.audio.newSource("assets/music/soundtrack01.mp3", "stream")
@@ -826,6 +834,22 @@ function CreateNewBubbleParticle(bubble, bottleNum)
     1, 1, 1, 0.8,  -- Start color (white with 80% opacity)
     1, 1, 1, 0     -- End color (fade to transparent)
   )
+end
+
+function love.focus(focused)
+  if not focused then
+      wasPlayingBeforeFocusLoss = isMusicPlaying
+      
+      for _, source in pairs(audioSources) do
+          if source:isPlaying() then
+              source:pause()
+          end
+      end
+  else
+      if wasPlayingBeforeFocusLoss and isMusicPlaying then
+          backgroundMusic:play()
+      end
+  end
 end
 
 -- Helper function to convert HSV to RGB
